@@ -38,6 +38,5 @@ yarn-error.*
 
 example
 
-# generated native folders
+# Expo's iOS project remains generated; Android is now the checked-in native app.
 /ios
-/android

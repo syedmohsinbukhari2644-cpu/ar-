@@ -1,6 +1,6 @@
 # Beauty Camera Tester
 
-Phase 1 provides the Android front-camera permission flow and mirrored live preview. The beauty effect is intentionally not claimed yet; it is scheduled for the later MediaPipe and OpenGL phases.
+The repository preserves the Expo source and now includes a separate, buildable native Kotlin Android app under `android/`. The native app uses CameraX, MediaPipe Tasks Vision Face Landmarker, an OpenGL ES 3 beauty overlay, runtime permission handling, controls, performance labels, lifecycle cleanup, and screenshot saving.
 
 ## Required software
 
@@ -16,13 +16,16 @@ npm install
 npx expo start
 ```
 
-Press `a` in the Expo terminal for a connected Android device, or use a development build when native modules are added in later phases. For a native debug build:
+The native debug build requires JDK 17 and uses the checked-in Gradle project:
 
 ```bash
-npx expo run:android
+cd android
+gradlew.bat assembleDebug
 ```
 
-The APK is written under `android/app/build/outputs/apk/debug/app-debug.apk` after the native Android project is generated.
+The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+The Expo source remains runnable with `npx expo start`; it is not used by the native Gradle build.
 
 ## Build APK with GitHub Actions
 
@@ -39,7 +42,7 @@ git push -u origin main
 
 Open the repository's **Actions** tab, choose **Build Android APK**, and click **Run workflow**. When it finishes, open the workflow run and download the artifact named `beauty-camera-tester-debug-apk`. Extract it and install `app-debug.apk` on the phone.
 
-The workflow creates the native `android/` folder during the build, so it remains ignored locally. No signing key is included; this is a debug APK for testing only.
+The workflow downloads the official MediaPipe Face Landmarker model to `android/app/src/main/assets/face_landmarker.task`, then runs `gradlew assembleDebug`. No signing key is included; this is a debug APK for testing only. For offline builds, download that model into the same assets directory first.
 
 ## USB debugging
 
@@ -53,7 +56,7 @@ On the phone, open Settings > About phone and tap Build number seven times. In D
 
 ## Current scope
 
-MediaPipe Face Landmarker, coordinate transforms, protected skin masks, OpenGL ES rendering, performance metrics, and screenshot capture are later phases. Do not evaluate filter quality until those phases build successfully.
+The current native shader is a face-bounded prototype. Feature-specific protected holes, stronger temporal smoothing, and device performance calibration remain follow-up work.
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
