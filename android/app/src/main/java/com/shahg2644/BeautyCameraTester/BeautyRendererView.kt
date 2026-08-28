@@ -1,6 +1,13 @@
 package com.shahg2644.BeautyCameraTester
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.PixelFormat
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
@@ -16,6 +23,24 @@ class BeautyRendererView(context: Context) : GLSurfaceView(context) {
     private val points = AtomicReference<List<FloatArray>>(emptyList())
     init { setEGLContextClientVersion(3); setEGLConfigChooser(8, 8, 8, 8, 16, 0); setZOrderOnTop(true); holder.setFormat(PixelFormat.TRANSLUCENT); setRenderer(Renderer()); renderMode = RENDERMODE_CONTINUOUSLY }
     override fun onDraw(canvas: android.graphics.Canvas) { points.set(landmarks); super.onDraw(canvas) }
+    fun processFrame(source: Bitmap): Bitmap {
+        if (!filterEnabled || beauty <= 0f || landmarks.isEmpty()) return source
+        val xs = landmarks.map { it[0] }; val ys = landmarks.map { it[1] }
+        val left = ((xs.min() - .08f) * source.width).toInt().coerceAtLeast(0)
+        val top = ((ys.min() - .08f) * source.height).toInt().coerceAtLeast(0)
+        val right = ((xs.max() + .08f) * source.width).toInt().coerceAtMost(source.width)
+        val bottom = ((ys.max() + .08f) * source.height).toInt().coerceAtMost(source.height)
+        if (right <= left || bottom <= top) return source
+        val face = Bitmap.createBitmap(source, left, top, right - left, bottom - top)
+        val small = Bitmap.createScaledBitmap(face, (face.width / 7).coerceAtLeast(1), (face.height / 7).coerceAtLeast(1), true)
+        val smooth = Bitmap.createScaledBitmap(small, face.width, face.height, true)
+        val output = source.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(output)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { alpha = (beauty * 190).toInt().coerceIn(0, 190); colorFilter = ColorMatrixColorFilter(ColorMatrix(floatArrayOf(1f,0f,0f,0f,warmth * 12f, 0f,1f,0f,0f,warmth * 5f, 0f,0f,1f,0f,0f, 0f,0f,0f,1f,0f))) }
+        canvas.save(); canvas.clipPath(android.graphics.Path().apply { addOval(RectF(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat()), android.graphics.Path.Direction.CW) }); canvas.drawBitmap(smooth, null, Rect(left, top, right, bottom), paint); canvas.restore()
+        face.recycle(); small.recycle(); smooth.recycle()
+        return output
+    }
     private inner class Renderer : GLSurfaceView.Renderer {
         private var program = 0; private var frames = 0; private var start = System.nanoTime(); private var smoothed = emptyList<FloatArray>()
         override fun onSurfaceCreated(gl: javax.microedition.khronos.opengles.GL10?, config: javax.microedition.khronos.egl.EGLConfig?) { val v = "#version 300 es\nin vec2 p;void main(){gl_Position=vec4(p,0.,1.);}"; val f = "#version 300 es\nprecision mediump float;uniform float b,g,w;uniform vec4 face,leftEye,rightEye,mouth,resolution;out vec4 c;float ellipse(vec2 q,vec4 shape){return 1.-smoothstep(.72,1.,length((q-shape.xy)/shape.zw));}void main(){vec2 q=gl_FragCoord.xy/resolution.xy;float faceMask=ellipse(q,face);float eyeMask=max(ellipse(q,leftEye),ellipse(q,rightEye));float mouthMask=ellipse(q,mouth);float skinMask=faceMask*(1.-max(eyeMask,mouthMask));float strength=clamp(b*.32+g*.12,0.,.34)*skinMask;vec3 correction=vec3(.98+w*.10,.93+w*.04,.90);c=vec4(correction*strength,strength);}"; program = GLES30.glCreateProgram(); val vs = compile(GLES30.GL_VERTEX_SHADER, v); val fs = compile(GLES30.GL_FRAGMENT_SHADER, f); GLES30.glAttachShader(program, vs); GLES30.glAttachShader(program, fs); GLES30.glBindAttribLocation(program, 0, "p"); GLES30.glLinkProgram(program); GLES30.glClearColor(0f, 0f, 0f, 0f); GLES30.glEnable(GLES30.GL_BLEND); GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA) }
